@@ -1,0 +1,5 @@
+debs 
+_/
+*.dylib
+*.o
+*.stamp
