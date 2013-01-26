@@ -39,7 +39,7 @@ static BOOL enabled = YES;
 	%orig;
 
 	if (!enabled) {
-		%orig;
+		return;
 	}
 
 	// get the topmost application 
