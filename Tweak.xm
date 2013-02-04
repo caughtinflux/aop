@@ -25,7 +25,6 @@ static BOOL enabled = YES;
     %orig;
     if ([[NSFileManager defaultManager] fileExistsAtPath:kPrefPath]) {
         // load up the prefs
-        NSLog(@"AOP: File Exists");
         NSDictionary *prefs = [[NSDictionary alloc] initWithContentsOfFile:kPrefPath];
         enabled = [prefs[@"enabled"] boolValue];
         if (enabled) {
@@ -163,13 +162,11 @@ static void AOPWritePrefsToFile(void)
 
 %ctor 
 {
-    NSAutoreleasePool *p = [[NSAutoreleasePool alloc] init];
-    
-    %init;
-    
-    // register ourself for notifications from the SBSettings toggle
-    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPEnableSensor, CFSTR("com.flux.aoproximity/enable"), NULL, CFNotificationSuspensionBehaviorHold);
-    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPDisableSensor, CFSTR("com.flux.aoproximity/disable"), NULL, CFNotificationSuspensionBehaviorHold);
-
-    [p drain];
+    @autoreleasepool {
+        %init;
+        
+        // register ourself for notifications from the SBSettings toggle
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPEnableSensor, CFSTR("com.flux.aoproximity/enable"), NULL, CFNotificationSuspensionBehaviorHold);
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPDisableSensor, CFSTR("com.flux.aoproximity/disable"), NULL, CFNotificationSuspensionBehaviorHold);
+    }
 }
