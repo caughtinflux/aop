@@ -21,59 +21,59 @@ static BOOL enabled = YES;
 %hook SpringBoard
 - (void)applicationDidFinishLaunching:(SpringBoard *)app
 {
-	%orig;
-	if ([[NSFileManager defaultManager] fileExistsAtPath:kPrefPath]) {
-		// load up the prefs
-		NSLog(@"AOP: File Exists");
-		NSDictionary *prefs = [[NSDictionary alloc] initWithContentsOfFile:kPrefPath];
-		enabled = [prefs[@"enabled"] boolValue];
-		if (enabled) {
-			AOPEnableSensor();
-		}
-		[prefs release];
-	}
-	else {
-		AOPEnableSensor();
-	}
+    %orig;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:kPrefPath]) {
+        // load up the prefs
+        NSLog(@"AOP: File Exists");
+        NSDictionary *prefs = [[NSDictionary alloc] initWithContentsOfFile:kPrefPath];
+        enabled = [prefs[@"enabled"] boolValue];
+        if (enabled) {
+            AOPEnableSensor();
+        }
+        [prefs release];
+    }
+    else {
+        AOPEnableSensor();
+    }
 }
 
 - (void)setExpectsFaceContact:(BOOL)expectsFaceContact
 {
-	// make sure nothing else disables the sensor.
-	if (enabled) {
-		%orig(YES);
-	}
-	else {
-		%orig(NO);
-	}
+    // make sure nothing else disables the sensor.
+    if (enabled) {
+        %orig(YES);
+    }
+    else {
+        %orig(NO);
+    }
 }
 
 - (void)_proximityChanged:(NSNotification *)notification
 {
-	// get the topmost application 
-	SBApplication *topApp = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication];
+    // get the topmost application 
+    SBApplication *topApp = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication];
 
-	if ([[topApp bundleIdentifier] isEqualToString:@"com.apple.camera"] || (!enabled)) {
-		return; // don't turn off the screen
-	}
+    if ([[topApp bundleIdentifier] isEqualToString:@"com.apple.camera"] || (!enabled)) {
+        return; // don't turn off the screen
+    }
 
-	%orig;
+    %orig;
 
-	if ((topApp == nil) || ([[topApp bundleIdentifier] isEqualToString:@"com.saurik.Cydia"]) || ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]))  {
-		// don't notify to resume/resign active
-		return;
-	}
+    if ((topApp == nil) || ([[topApp bundleIdentifier] isEqualToString:@"com.saurik.Cydia"]) || ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]))  {
+        // don't notify to resume/resign active
+        return;
+    }
 
-	int state = [[notification.userInfo objectForKey:@"kSBNotificationKeyState"] intValue]; // this is probably a BOOL.
-	if (state == 1) {
-		// screen is going off.
-		[topApp notifyResignActiveForReason:1];
-	}
-	else if (state == 0) {
-		// screen is turning on.
-		[topApp notifyResumeActiveForReason:1];
-	}
-	
+    int state = [[notification.userInfo objectForKey:@"kSBNotificationKeyState"] intValue]; // this is probably a BOOL.
+    if (state == 1) {
+        // screen is going off.
+        [topApp notifyResignActiveForReason:1];
+    }
+    else if (state == 0) {
+        // screen is turning on.
+        [topApp notifyResumeActiveForReason:1];
+    }
+    
 }
 %end
 
@@ -84,38 +84,38 @@ static BOOL enabled = YES;
 
 - (id)init
 {
-	self = [super init];
-	if (self) {
-		// register self for call state change notifications
-		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(callStateChanged) name:@"com.apple.springboard.activeCallStateChanged" object:nil];
-	}
-	return self;
+    self = [super init];
+    if (self) {
+        // register self for call state change notifications
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(callStateChanged) name:@"com.apple.springboard.activeCallStateChanged" object:nil];
+    }
+    return self;
 }
 
 - (void)callStateChanged
 {
-	// enable the proximity sensor when in call.
-	if (([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) && (enabled == NO)) {
-		AOPEnableSensor();
-	}
-	else if (![[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
-		AOPDisableSensor();
-	}
+    // enable the proximity sensor when in call.
+    if (([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) && (enabled == NO)) {
+        AOPEnableSensor();
+    }
+    else if (![[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
+        AOPDisableSensor();
+    }
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event
 {
-	(enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
+    (enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
 
-	// create a bulletin request to display a banner when toggled.
-	BBBulletinRequest *request = [[[%c(BBBulletinRequest) alloc] init] autorelease];
-	request.title 	  = @"Always On Proximity";
-	request.message   = [NSString stringWithFormat:@"Proximity sensor %@", ((enabled) ? @"enabled" : @"disabled")];	
-	request.sectionID = @"com.apple.Preferences";
-	
-	[(SBBulletinBannerController *)[%c(SBBulletinBannerController) sharedInstance] observer:nil addBulletin:request forFeed:2];
+    // create a bulletin request to display a banner when toggled.
+    BBBulletinRequest *request = [[[%c(BBBulletinRequest) alloc] init] autorelease];
+    request.title     = @"Always On Proximity";
+    request.message   = [NSString stringWithFormat:@"Proximity sensor %@", ((enabled) ? @"enabled" : @"disabled")]; 
+    request.sectionID = @"com.apple.Preferences";
+    
+    [(SBBulletinBannerController *)[%c(SBBulletinBannerController) sharedInstance] observer:nil addBulletin:request forFeed:2];
 
-	event.handled = YES;
+    event.handled = YES;
 }
 
 + (void)load
@@ -128,40 +128,40 @@ static BOOL enabled = YES;
 
 static void AOPEnableSensor(void)
 {
-	enabled = YES;
-	[(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
-	@autoreleasepool {
-		NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
-		[prefs setObject:[NSNumber numberWithBool:YES] forKey:@"enabled"];	
-		[prefs writeToFile:kPrefPath atomically:YES];
-		[prefs release];
-	}
+    enabled = YES;
+    [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
+    @autoreleasepool {
+        NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
+        [prefs setObject:[NSNumber numberWithBool:YES] forKey:@"enabled"];  
+        [prefs writeToFile:kPrefPath atomically:YES];
+        [prefs release];
+    }
 }
 
 static void AOPDisableSensor(void)
 {
-	enabled = NO;
-	[(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
-	@autoreleasepool {
-		NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
-		if (!prefs) {
-			prefs = [[NSMutableDictionary alloc] init];
-		}
-		[prefs setObject:[NSNumber numberWithBool:NO] forKey:@"enabled"];
-		[prefs writeToFile:kPrefPath atomically:YES];
-		[prefs release];
-	}
+    enabled = NO;
+    [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
+    @autoreleasepool {
+        NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
+        if (!prefs) {
+            prefs = [[NSMutableDictionary alloc] init];
+        }
+        [prefs setObject:[NSNumber numberWithBool:NO] forKey:@"enabled"];
+        [prefs writeToFile:kPrefPath atomically:YES];
+        [prefs release];
+    }
 }
 
 %ctor 
 {
-	NSAutoreleasePool *p = [[NSAutoreleasePool alloc] init];
-	
-	%init;
-	
-	// register ourself for notifications from the SBSettings toggle
-	CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPEnableSensor, CFSTR("com.flux.aoproximity/enable"), NULL, CFNotificationSuspensionBehaviorHold);
-	CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPDisableSensor, CFSTR("com.flux.aoproximity/disable"), NULL, CFNotificationSuspensionBehaviorHold);
+    NSAutoreleasePool *p = [[NSAutoreleasePool alloc] init];
+    
+    %init;
+    
+    // register ourself for notifications from the SBSettings toggle
+    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPEnableSensor, CFSTR("com.flux.aoproximity/enable"), NULL, CFNotificationSuspensionBehaviorHold);
+    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPDisableSensor, CFSTR("com.flux.aoproximity/disable"), NULL, CFNotificationSuspensionBehaviorHold);
 
-	[p drain];
+    [p drain];
 }
