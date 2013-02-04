@@ -1,5 +1,1 @@
-debs 
-_/
-*.dylib
-*.o
-*.stamp
+*.deb
