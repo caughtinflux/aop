@@ -39,13 +39,7 @@ static BOOL enabled = YES;
 
 - (void)setExpectsFaceContact:(BOOL)expectsFaceContact
 {
-    // make sure nothing else disables the sensor.
-    if (enabled) {
-        %orig(YES);
-    }
-    else {
-        %orig(NO);
-    }
+    %orig(enabled);
 }
 
 - (void)_proximityChanged:(NSNotification *)notification
