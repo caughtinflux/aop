@@ -120,9 +120,9 @@ static BOOL enabled = YES;
 
 + (void)load
 {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-    [[LAActivator sharedInstance] registerListener:[self new] forName:@"com.flux.aop"];
-    [pool drain];
+    @autoreleasepool {
+        [[LAActivator sharedInstance] registerListener:[self new] forName:@"com.flux.aop"];
+    }
 }
 
 - (void)dealloc
