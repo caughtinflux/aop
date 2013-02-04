@@ -7,6 +7,11 @@
 
 #import "BannerClasses.h"
 
+#define kPrefPath [NSHomeDirectory() stringByAppendingString:@"/Library/Preferences/com.flux.aoproximity.plist"]
+
+static void AOPEnableSensor(void);
+static void AOPDisableSensor(void);
+
 @interface SpringBoard : UIApplication
 - (void)setExpectsFaceContact:(BOOL)something;
 - (SBApplication *)_accessibilityFrontMostApplication;
@@ -17,9 +22,18 @@ static BOOL enabled = YES;
 - (void)applicationDidFinishLaunching:(SpringBoard *)app
 {
 	%orig;
-	if (enabled) {
-		// switch the proximity sensor on first launch
-		[app setExpectsFaceContact:YES];
+	if ([[NSFileManager defaultManager] fileExistsAtPath:kPrefPath]) {
+		// load up the prefs
+		NSLog(@"AOP: File Exists");
+		NSDictionary *prefs = [[NSDictionary alloc] initWithContentsOfFile:kPrefPath];
+		enabled = [prefs[@"enabled"] boolValue];
+		if (enabled) {
+			AOPEnableSensor();
+		}
+		[prefs release];
+	}
+	else {
+		AOPEnableSensor();
 	}
 }
 
@@ -36,33 +50,30 @@ static BOOL enabled = YES;
 
 - (void)_proximityChanged:(NSNotification *)notification
 {
-	%orig;
-
-	if (!enabled) {
-		return;
-	}
-
 	// get the topmost application 
 	SBApplication *topApp = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication];
-	if ([[topApp bundleIdentifier] isEqualToString:@"com.apple.camera"])
-		return;
 
-	if (topApp != nil ) {
-		int state = [[notification.userInfo objectForKey:@"kSBNotificationKeyState"] intValue]; // this is probably a BOOL.
-		
-		if ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
-			// if a call is active, don't notify the Phone app to resign/resume active. It knows what it's doing.
-			return;
-		}
-		else if (state == 1) {
-			// screen is going off.
-			[topApp notifyResignActiveForReason:1];
-		}
-		else if (state == 0) {
-			// screen is turning on.
-			[topApp notifyResumeActiveForReason:1];
-		}
+	if ([[topApp bundleIdentifier] isEqualToString:@"com.apple.camera"] || (!enabled)) {
+		return; // don't turn off the screen
 	}
+
+	%orig;
+
+	if ((topApp == nil) || ([[topApp bundleIdentifier] isEqualToString:@"com.saurik.Cydia"]) || ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]))  {
+		// don't notify to resume/resign active
+		return;
+	}
+
+	int state = [[notification.userInfo objectForKey:@"kSBNotificationKeyState"] intValue]; // this is probably a BOOL.
+	if (state == 1) {
+		// screen is going off.
+		[topApp notifyResignActiveForReason:1];
+	}
+	else if (state == 0) {
+		// screen is turning on.
+		[topApp notifyResumeActiveForReason:1];
+	}
+	
 }
 %end
 
@@ -75,31 +86,26 @@ static BOOL enabled = YES;
 {
 	self = [super init];
 	if (self) {
-		// register self for KVO notifications.
-		[[%c(SBTelephonyManager) sharedTelephonyManager] addObserver:self forKeyPath:@"inCall" options:NSKeyValueObservingOptionNew context:NULL];
+		// register self for call state change notifications
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(callStateChanged) name:@"com.apple.springboard.activeCallStateChanged" object:nil];
 	}
 	return self;
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+- (void)callStateChanged
 {
 	// enable the proximity sensor when in call.
-	if ([keyPath isEqualToString:@"inCall"]) {
-		if ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
-			if (!enabled) {
-				enabled = YES;
-				[(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:enabled];
-				enabled = NO; // set it back to original (off) state.
-			}
-		}
+	if (([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) && (enabled == NO)) {
+		AOPEnableSensor();
+	}
+	else if (![[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
+		AOPDisableSensor();
 	}
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event
 {
-	// set enabled to opposite.
-	enabled = !enabled;
-	[(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:enabled];
+	(enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
 
 	// create a bulletin request to display a banner when toggled.
 	BBBulletinRequest *request = [[[%c(BBBulletinRequest) alloc] init] autorelease];
@@ -120,17 +126,31 @@ static BOOL enabled = YES;
 }
 @end
 
-// simple static functions to respond to notifications posted by the SBSettings toggle
 static void AOPEnableSensor(void)
 {
 	enabled = YES;
 	[(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
+	@autoreleasepool {
+		NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
+		[prefs setObject:[NSNumber numberWithBool:YES] forKey:@"enabled"];	
+		[prefs writeToFile:kPrefPath atomically:YES];
+		[prefs release];
+	}
 }
 
 static void AOPDisableSensor(void)
 {
 	enabled = NO;
 	[(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
+	@autoreleasepool {
+		NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
+		if (!prefs) {
+			prefs = [[NSMutableDictionary alloc] init];
+		}
+		[prefs setObject:[NSNumber numberWithBool:NO] forKey:@"enabled"];
+		[prefs writeToFile:kPrefPath atomically:YES];
+		[prefs release];
+	}
 }
 
 %ctor 
