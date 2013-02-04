@@ -11,6 +11,7 @@
 
 static void AOPEnableSensor(void);
 static void AOPDisableSensor(void);
+static void AOPWritePrefsToFile(void);
 
 @interface SpringBoard : UIApplication
 - (void)setExpectsFaceContact:(BOOL)something;
@@ -124,30 +125,37 @@ static BOOL enabled = YES;
     [[LAActivator sharedInstance] registerListener:[self new] forName:@"com.flux.aop"];
     [pool drain];
 }
+
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [super dealloc];
+}
+
 @end
 
 static void AOPEnableSensor(void)
 {
     enabled = YES;
     [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
-    @autoreleasepool {
-        NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
-        [prefs setObject:[NSNumber numberWithBool:YES] forKey:@"enabled"];  
-        [prefs writeToFile:kPrefPath atomically:YES];
-        [prefs release];
-    }
+    AOPWritePrefsToFile();
 }
 
 static void AOPDisableSensor(void)
 {
     enabled = NO;
     [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
+    AOPWritePrefsToFile();
+}
+
+static void AOPWritePrefsToFile(void)
+{
     @autoreleasepool {
         NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
         if (!prefs) {
             prefs = [[NSMutableDictionary alloc] init];
         }
-        [prefs setObject:[NSNumber numberWithBool:NO] forKey:@"enabled"];
+        prefs[@"enabled"] = @(enabled);
         [prefs writeToFile:kPrefPath atomically:YES];
         [prefs release];
     }
