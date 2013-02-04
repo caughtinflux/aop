@@ -1,6 +1,6 @@
 Package: com.flux.aoproximity
 Name: Always On Proximity
-Depends: firmware (>= 5.0), mobilesubstrate, libactivator, gsc.telephony
+Depends: firmware (>= 5.0), mobilesubstrate, gsc.telephony
 Version: 1.1
 Architecture: iphoneos-arm
 Description: Enable or disable your phone's proximity sensor by a simple activator gesture.
