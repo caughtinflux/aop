@@ -5,31 +5,25 @@
 
 @interface SpringBoard : UIApplication
 - (BOOL)expectsFaceContact;
-- (void)setExpectsFaceContact:(BOOL)something;
-- (SBApplication *)_accessibilityFrontMostApplication;
 @end
 
-// Required
 extern "C" BOOL isCapable()
 {
+	// can return YES, because it can only be installed on devices with telephony capabilities
 	return YES;
 }
 
-// Required
 extern "C" BOOL isEnabled()
 {
 	return [(SpringBoard *)[UIApplication sharedApplication] expectsFaceContact];
 }
 
-// Required
 extern "C" void setState(BOOL state)
 {
 	// send appropriate notification
 	notify_post((state ? "com.flux.aoproximity/enable" : "com.flux.aoproximity/disable"));
 }
 
-// Required
-// How long the toggle takes to toggle, in seconds.
 extern "C" float getDelayTime()
 {
 	return 0.08f;

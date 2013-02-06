@@ -13,14 +13,15 @@ static void AOPEnableSensor(void);
 static void AOPDisableSensor(void);
 static void AOPWritePrefsToFile(void);
 
+static BOOL enabled = YES;
+
 @interface SpringBoard : UIApplication
 - (void)setExpectsFaceContact:(BOOL)something;
 - (SBApplication *)_accessibilityFrontMostApplication;
 @end
 
-static BOOL enabled = YES;
 %hook SpringBoard
-- (void)applicationDidFinishLaunching:(SpringBoard *)app
+- (void)_performDeferredLaunchWork
 {
     %orig;
     if ([[NSFileManager defaultManager] fileExistsAtPath:kPrefPath]) {
@@ -80,25 +81,33 @@ static BOOL enabled = YES;
 {
     self = [super init];
     if (self) {
-        // register self for call state change notifications
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(callStateChanged) name:@"com.apple.springboard.activeCallStateChanged" object:nil];
     }
     return self;
 }
 
+static BOOL didChangeState;
 - (void)callStateChanged
 {
-    // enable the proximity sensor when in call.
-    if (([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) && (enabled == NO)) {
-        AOPEnableSensor();
+    BOOL inCall = [[%c(SBTelephonyManager) sharedTelephonyManager] inCall];
+    if (!enabled && inCall) {
+        enabled = YES;
+        [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:enabled];
+        didChangeState = YES;
     }
-    else if (![[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
-        AOPDisableSensor();
+    if (!inCall && didChangeState) {
+        enabled = NO;
+        [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:enabled];
+        didChangeState = NO;
     }
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event
 {
+    if ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]) {
+        return;
+    }
+
     (enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
 
     // create a bulletin request to display a banner when toggled.
