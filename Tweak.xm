@@ -1,8 +1,10 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <objc/runtime.h>
+
+#import <SpringBoard/SpringBoard.h>
 #import <SpringBoard/SBApplication.h>
 #import <SpringBoard/SBTelephonyManager.h>
+
 #import <libactivator/libactivator.h>
 
 #import "BannerClasses.h"
@@ -13,62 +15,67 @@ static void AOPEnableSensor(void);
 static void AOPDisableSensor(void);
 static void AOPWritePrefsToFile(void);
 
-static BOOL enabled = YES;
-
-@interface SpringBoard : UIApplication
-- (void)setExpectsFaceContact:(BOOL)something;
-- (SBApplication *)_accessibilityFrontMostApplication;
-@end
+static BOOL _enabled;
+static BOOL _allowIdleTimerToClear;
 
 %hook SpringBoard
 - (void)_performDeferredLaunchWork
 {
     %orig;
-    if ([[NSFileManager defaultManager] fileExistsAtPath:kPrefPath]) {
-        // load up the prefs
-        NSDictionary *prefs = [[NSDictionary alloc] initWithContentsOfFile:kPrefPath];
-        enabled = [prefs[@"enabled"] boolValue];
-        if (enabled) {
-            AOPEnableSensor();
-        }
-        [prefs release];
-    }
-    else {
+    
+    // load up the prefs
+    NSDictionary *prefs = [[NSDictionary alloc] initWithContentsOfFile:kPrefPath];
+    _enabled = [prefs[@"enabled"] boolValue];
+
+    if (_enabled || (prefs == nil)) {
+        // if the file doesn't exist, enable the sensor, and create the file. 
         AOPEnableSensor();
     }
+
+    [prefs release];
 }
 
 - (void)setExpectsFaceContact:(BOOL)expectsFaceContact
 {
-    %orig(enabled);
+    %orig(_enabled);
 }
 
 - (void)_proximityChanged:(NSNotification *)notification
 {
     // get the topmost application 
-    SBApplication *topApp = [(SpringBoard *)[UIApplication sharedApplication] _accessibilityFrontMostApplication];
+    SBApplication *topApp = [(SpringBoard *)self _accessibilityFrontMostApplication];
 
-    if ([[topApp bundleIdentifier] isEqualToString:@"com.apple.camera"] || (!enabled)) {
+    if ([[topApp bundleIdentifier] isEqualToString:@"com.apple.camera"] || (!_enabled)) {
         return; // don't turn off the screen
     }
 
+    _allowIdleTimerToClear = NO;
     %orig;
+    _allowIdleTimerToClear = YES;
 
     if ((topApp == nil) || ([[topApp bundleIdentifier] isEqualToString:@"com.saurik.Cydia"]) || ([[%c(SBTelephonyManager) sharedTelephonyManager] inCall]))  {
         // don't notify to resume/resign active
         return;
     }
 
-    int state = [[notification.userInfo objectForKey:@"kSBNotificationKeyState"] intValue]; // this is probably a BOOL.
-    if (state == 1) {
-        // screen is going off.
+    BOOL objectWithinProximity = [[notification.userInfo objectForKey:@"kSBNotificationKeyState"] boolValue];
+    if (objectWithinProximity) {
         [topApp notifyResignActiveForReason:1];
     }
-    else if (state == 0) {
-        // screen is turning on.
+    else {
         [topApp notifyResumeActiveForReason:1];
     }
     
+}
+
+- (void)clearIdleTimer
+{
+    if (_allowIdleTimerToClear) {
+        %orig;
+    }
+    else {
+        return;
+    }
 }
 %end
 
@@ -90,14 +97,14 @@ static BOOL didChangeState;
 - (void)callStateChanged
 {
     BOOL inCall = [[%c(SBTelephonyManager) sharedTelephonyManager] inCall];
-    if (!enabled && inCall) {
-        enabled = YES;
-        [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:enabled];
+    if (!_enabled && inCall) {
+        _enabled = YES;
+        [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:_enabled];
         didChangeState = YES;
     }
     if (!inCall && didChangeState) {
-        enabled = NO;
-        [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:enabled];
+        _enabled = NO;
+        [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:_enabled];
         didChangeState = NO;
     }
 }
@@ -108,15 +115,16 @@ static BOOL didChangeState;
         return;
     }
 
-    (enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
+    (_enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
 
     // create a bulletin request to display a banner when toggled.
-    BBBulletinRequest *request = [[[%c(BBBulletinRequest) alloc] init] autorelease];
+    BBBulletinRequest *request = [[%c(BBBulletinRequest) alloc] init];
     request.title     = @"Always On Proximity";
-    request.message   = [NSString stringWithFormat:@"Proximity sensor %@", ((enabled) ? @"enabled" : @"disabled")]; 
+    request.message   = [NSString stringWithFormat:@"Proximity sensor %@", ((_enabled) ? @"enabled" : @"disabled")]; 
     request.sectionID = @"com.apple.Preferences";
     
     [(SBBulletinBannerController *)[%c(SBBulletinBannerController) sharedInstance] observer:nil addBulletin:request forFeed:2];
+    [request release];
 
     event.handled = YES;
 }
@@ -138,14 +146,14 @@ static BOOL didChangeState;
 
 static void AOPEnableSensor(void)
 {
-    enabled = YES;
+    _enabled = YES;
     [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
     AOPWritePrefsToFile();
 }
 
 static void AOPDisableSensor(void)
 {
-    enabled = NO;
+    _enabled = NO;
     [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
     AOPWritePrefsToFile();
 }
@@ -153,11 +161,8 @@ static void AOPDisableSensor(void)
 static void AOPWritePrefsToFile(void)
 {
     @autoreleasepool {
-        NSMutableDictionary *prefs = [[NSDictionary dictionaryWithContentsOfFile:kPrefPath] mutableCopy];
-        if (!prefs) {
-            prefs = [[NSMutableDictionary alloc] init];
-        }
-        prefs[@"enabled"] = @(enabled);
+        NSMutableDictionary *prefs = [@{} mutableCopy];
+        prefs[@"enabled"] = @(_enabled);
         [prefs writeToFile:kPrefPath atomically:YES];
         [prefs release];
     }
