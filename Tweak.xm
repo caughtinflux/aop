@@ -1,20 +1,13 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-
-#import <SpringBoard/SpringBoard.h>
-#import <SpringBoard/SBApplication.h>
-#import <SpringBoard/SBTelephonyManager.h>
-
-#import <libactivator/libactivator.h>
-
-#import "BannerClasses.h"
+#import "AOP.h"
 
 #define kPrefPath [NSHomeDirectory() stringByAppendingString:@"/Library/Preferences/com.flux.aoproximity.plist"]
+#ifndef kCFCoreFoundationVersionNumber_iOS_7_0
+#define kCFCoreFoundationVersionNumber_iOS_7_0 847.20
+#endif
 
-static void AOPEnableSensor(void);
-static void AOPDisableSensor(void);
 static void AOPWritePrefsToFile(void);
-
 static BOOL _enabled;
 static BOOL _allowIdleTimerToClear;
 
@@ -144,18 +137,23 @@ static BOOL didChangeState;
 
 @end
 
-static void AOPEnableSensor(void)
+void AOPEnableSensor(void)
 {
     _enabled = YES;
     [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
     AOPWritePrefsToFile();
 }
 
-static void AOPDisableSensor(void)
+void AOPDisableSensor(void)
 {
     _enabled = NO;
     [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
     AOPWritePrefsToFile();
+}
+
+BOOL AOPGetCurrentState(void)
+{
+    return _enabled;
 }
 
 static void AOPWritePrefsToFile(void)
@@ -172,9 +170,5 @@ static void AOPWritePrefsToFile(void)
 {
     @autoreleasepool {
         %init;
-        
-        // register ourself for notifications from the SBSettings toggle
-        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPEnableSensor, CFSTR("com.flux.aoproximity/enable"), NULL, CFNotificationSuspensionBehaviorHold);
-        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, (CFNotificationCallback)&AOPDisableSensor, CFSTR("com.flux.aoproximity/disable"), NULL, CFNotificationSuspensionBehaviorHold);
     }
 }

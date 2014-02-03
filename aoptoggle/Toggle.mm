@@ -1,35 +1,47 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <SpringBoard/SBApplication.h>
-#import <notify.h>
+#import <dlfcn.h>
+#import "../AOP.h"
 
-@interface SpringBoard : UIApplication
-- (BOOL)expectsFaceContact;
-@end
 
-extern "C" BOOL isCapable()
+static void (*enableSensor)(void);
+static void (*disableSensor)(void);
+static BOOL (*currentState)(void);
+
+extern "C" BOOL isCapable(void)
 {
-	// can return YES, because it can only be installed on devices with telephony capabilities
-	return YES;
+    // can return YES, because it can only be installed on devices with telephony capabilities
+    return YES;
 }
 
-extern "C" BOOL isEnabled()
+extern "C" BOOL isEnabled(void)
 {
-	return [(SpringBoard *)[UIApplication sharedApplication] expectsFaceContact];
+    return currentState();
 }
 
 extern "C" void setState(BOOL state)
 {
-	// send appropriate notification
-	notify_post((state ? "com.flux.aoproximity/enable" : "com.flux.aoproximity/disable"));
+    // send appropriate notification
+    (state ? enableSensor() : disableSensor());
 }
 
-extern "C" float getDelayTime()
+extern "C" float getDelayTime(void)
 {
-	return 0.08f;
+    return 0.08f;
 }
 
-extern "C" BOOL allowInCall()
+extern "C" BOOL allowInCall(void)
 {
-	return NO;
+    return NO;
+}
+
+static void __attribute__((constructor)) __constructor(void)
+{
+    void *handle = dlopen("/Library/MobileSubstrate/DynamicLibraries/AlwaysOnProximity.dylib", RTLD_NOW);
+    if (handle) {
+        enableSensor = (void(*)(void))dlsym(handle, "AOPEnableSensor");
+        disableSensor = (void(*)(void))dlsym(handle, "AOPDisableSensor");
+        currentState = (BOOL(*)(void))dlsym(handle, "AOPGetCurrentState");
+    }
 }
