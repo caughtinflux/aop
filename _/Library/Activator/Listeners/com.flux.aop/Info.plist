@@ -1,5 +1,0 @@
-{
-	title = "Always On Proximity";
-	description = "Toggle the proximity sensor state";
-	"compatible-modes" = ("springboard", "application", "lockscreen");
-}
