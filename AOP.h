@@ -1,15 +1,10 @@
 #import <SpringBoard/SpringBoard.h>
-#import <SpringBoard/SBApplication.h>
-#import <SpringBoard/SBTelephonyManager.h>
-#import <libactivator/libactivator.h>
-#import "BannerClasses.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-    extern void AOPEnableSensor();
-    extern void AOPDisableSensor();
-    extern BOOL AOPGetCurrentState();
+    extern void AOPSetIsEnabled(BOOL isEnabled);
+    extern BOOL AOPGetIsEnabled(void);
 #ifdef __cplusplus
 }
 #endif

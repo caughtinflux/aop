@@ -1,6 +1,8 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <libactivator/libactivator.h>
 #import "AOP.h"
+#import "BannerClasses.h"
 
 #define kPrefPath [NSHomeDirectory() stringByAppendingString:@"/Library/Preferences/com.flux.aoproximity.plist"]
 #ifndef kCFCoreFoundationVersionNumber_iOS_7_0
@@ -22,7 +24,7 @@ static BOOL _allowIdleTimerToClear;
 
     if (_enabled || (prefs == nil)) {
         // if the file doesn't exist, enable the sensor, and create the file. 
-        AOPEnableSensor();
+        AOPSetIsEnabled(YES);
     }
 
     [prefs release];
@@ -108,7 +110,7 @@ static BOOL didChangeState;
         return;
     }
 
-    (_enabled == YES) ? AOPDisableSensor() : AOPEnableSensor();
+    AOPSetIsEnabled(!_enabled);
 
     // create a bulletin request to display a banner when toggled.
     BBBulletinRequest *request = [[%c(BBBulletinRequest) alloc] init];
@@ -137,21 +139,15 @@ static BOOL didChangeState;
 
 @end
 
-void AOPEnableSensor(void)
+extern void AOPSetIsEnabled(BOOL isEnabled)
 {
-    _enabled = YES;
-    [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:YES];
+    _enabled = isEnabled;
+    [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:isEnabled];
     AOPWritePrefsToFile();
+
 }
 
-void AOPDisableSensor(void)
-{
-    _enabled = NO;
-    [(SpringBoard *)[UIApplication sharedApplication] setExpectsFaceContact:NO];
-    AOPWritePrefsToFile();
-}
-
-BOOL AOPGetCurrentState(void)
+extern BOOL AOPGetIsEnabled(void)
 {
     return _enabled;
 }
@@ -172,3 +168,4 @@ static void AOPWritePrefsToFile(void)
         %init;
     }
 }
+

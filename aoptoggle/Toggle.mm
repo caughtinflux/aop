@@ -5,9 +5,8 @@
 #import "../AOP.h"
 
 
-static void (*enableSensor)(void);
-static void (*disableSensor)(void);
-static BOOL (*currentState)(void);
+static void (*SetSensorEnabled)(BOOL);
+static BOOL (*SensorIsEnabled)(void);
 
 extern "C" BOOL isCapable(void)
 {
@@ -17,13 +16,13 @@ extern "C" BOOL isCapable(void)
 
 extern "C" BOOL isEnabled(void)
 {
-    return currentState();
+    return SensorIsEnabled();
 }
 
 extern "C" void setState(BOOL state)
 {
     // send appropriate notification
-    (state ? enableSensor() : disableSensor());
+    SetSensorEnabled(state);
 }
 
 extern "C" float getDelayTime(void)
@@ -40,8 +39,7 @@ static void __attribute__((constructor)) __constructor(void)
 {
     void *handle = dlopen("/Library/MobileSubstrate/DynamicLibraries/AlwaysOnProximity.dylib", RTLD_NOW);
     if (handle) {
-        enableSensor = (void(*)(void))dlsym(handle, "AOPEnableSensor");
-        disableSensor = (void(*)(void))dlsym(handle, "AOPDisableSensor");
-        currentState = (BOOL(*)(void))dlsym(handle, "AOPGetCurrentState");
+        SetSensorEnabled = (void(*)(BOOL))dlsym(handle, "AOPSetIsEnabled");
+        SensorIsEnabled = (BOOL(*)(void))dlsym(handle, "AOPGetIsEnabled");
     }
 }

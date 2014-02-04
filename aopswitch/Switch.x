@@ -5,9 +5,8 @@
 @interface AOPSwitch : NSObject <FSSwitchDataSource>
 @end
 
-static void (*enableSensor)(void);
-static void (*disableSensor)(void);
-static BOOL (*currentState)(void);
+static void (*SetSensorEnabled)(BOOL);
+static BOOL (*SensorIsEnabled)(void);
 
 @implementation AOPSwitch
 
@@ -15,25 +14,19 @@ static BOOL (*currentState)(void);
 {
     void *handle = dlopen("/Library/MobileSubstrate/DynamicLibraries/AlwaysOnProximity.dylib", RTLD_NOW);
     if (handle) {
-        enableSensor = (void(*)(void))dlsym(handle, "AOPEnableSensor");
-        disableSensor = (void(*)(void))dlsym(handle, "AOPDisableSensor");
-        currentState = (BOOL(*)(void))dlsym(handle, "AOPGetCurrentState");
+        SetSensorEnabled = (void(*)(BOOL))dlsym(handle, "AOPSetIsEnabled");
+        SensorIsEnabled = (BOOL(*)(void))dlsym(handle, "AOPGetIsEnabled");
     }
 }
 
 - (FSSwitchState)stateForSwitchIdentifier:(NSString *)switchIdentifier
 {
-    return (currentState() ? FSSwitchStateOn : FSSwitchStateOff) ;
+    return (SensorIsEnabled() ? FSSwitchStateOn : FSSwitchStateOff) ;
 }
 
 - (void)applyState:(FSSwitchState)newState forSwitchIdentifier:(NSString *)switchIdentifier
 {
-    if (newState == FSSwitchStateOn) {
-        enableSensor();
-    }
-    else if (newState == FSSwitchStateOff) {
-        disableSensor();
-    }
+    SetSensorEnabled(newState == FSSwitchStateOn);
 }
 
 @end
